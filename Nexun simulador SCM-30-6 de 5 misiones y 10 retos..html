@@ -1,0 +1,885 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS SCM | Simulador de Supply Chain</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-950:#070E1A; --navy-900:#0B1B2E; --navy-800:#102945; --navy-700:#163559; --steel-600:#1B4965;
+    --teal-400:#2EC4B6; --teal-300:#5FE3D4;
+    --amber-400:#F4A300; --red-500:#E0473D; --green-400:#3DDC84;
+    --blue-400:#4DA3FF; --orange-400:#FF9F4D; --purple-400:#B98BFF; --yellow-400:#F4D03F; --gray-400:#9AA7B5;
+    --ink-100:#EAF2F8; --ink-300:#A9C0D6; --ink-500:#6E89A6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:
+      radial-gradient(ellipse 1200px 700px at 80% -10%, rgba(46,196,182,0.10), transparent),
+      radial-gradient(ellipse 900px 600px at 0% 100%, rgba(244,163,0,0.06), transparent),
+      var(--navy-950);
+    font-family:'Inter',sans-serif; color:var(--ink-100); min-height:100vh;
+  }
+  .font-display{font-family:'Space Grotesk',sans-serif;}
+  .font-mono{font-family:'JetBrains Mono',monospace;}
+  .panel{ background:linear-gradient(180deg, rgba(16,41,69,0.85), rgba(11,27,46,0.85)); border:1px solid rgba(95,227,212,0.12); backdrop-filter:blur(6px); }
+  .grid-overlay{ background-image:linear-gradient(rgba(95,227,212,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(95,227,212,0.04) 1px, transparent 1px); background-size:28px 28px; }
+  .kpi-bar{height:6px;border-radius:6px;background:rgba(255,255,255,0.07);overflow:hidden;}
+  .kpi-fill{height:100%;border-radius:6px;transition:width .6s cubic-bezier(.4,0,.2,1), background-color .6s;}
+  .card-hover{ transition:transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+  .card-hover:hover{ transform:translateY(-3px); border-color:rgba(95,227,212,0.45); box-shadow:0 12px 30px -10px rgba(46,196,182,0.25); }
+  .locked{ opacity:.4; filter:saturate(.35); cursor:not-allowed; pointer-events:none; }
+  .option-btn{ background:rgba(255,255,255,0.03); border:1px solid rgba(169,192,214,0.18); transition:all .18s ease; }
+  .option-btn:hover{ background:rgba(46,196,182,0.10); border-color:var(--teal-400); transform:translateX(3px); }
+  .scanline{ position:absolute; inset:0; pointer-events:none; opacity:.4; background:linear-gradient(transparent 50%, rgba(255,255,255,0.015) 50%); background-size:100% 4px; }
+  .pulse-dot{ animation:pulse 1.8s ease-in-out infinite; } @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .blink{ animation:blink 1.1s steps(1) infinite; } @keyframes blink{50%{opacity:0;}}
+  .fade-in{ animation:fadeIn .4s ease both; } @keyframes fadeIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+  .typeline{ opacity:0; animation:typeIn .5s ease forwards; } @keyframes typeIn{ to{opacity:1; transform:translateY(0);} from{opacity:0; transform:translateY(6px);} }
+  .toast-in{ animation:toastIn .4s cubic-bezier(.2,.9,.2,1.3) both; } @keyframes toastIn{from{opacity:0; transform:translateX(40px) scale(.95);} to{opacity:1; transform:translateX(0) scale(1);}}
+  .ticker-track{ animation:ticker 22s linear infinite; }
+  @keyframes ticker{ from{transform:translateX(0);} to{transform:translateX(-50%);} }
+  .map-marker{ transition:transform .2s ease, filter .2s ease; cursor:pointer; }
+  .map-marker:hover{ transform:scale(1.12); filter:brightness(1.3); }
+  .map-marker.active circle{ stroke:var(--teal-400); stroke-width:3; }
+  .map-location-btn{ transition:all .2s ease; cursor:pointer; background:rgba(255,255,255,0.03); border:1px solid rgba(169,192,214,0.12); }
+  .map-location-btn:hover{ background:rgba(46,196,182,0.10); border-color:var(--teal-400); transform:translateY(-2px); }
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:.001ms !important; transition-duration:.001ms !important;} }
+  ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:rgba(95,227,212,0.25); border-radius:6px;}
+</style>
+</head>
+<body class="grid-overlay">
+
+<!-- ============ HEADER ============ -->
+<header class="sticky top-0 z-40 panel border-b border-white/5">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3 cursor-pointer" onclick="goToMap()">
+      <!-- Logo con imagen y texto NEXUS SCM -->
+      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSPIMFD9JHv3YV0c7BB2qwQw39owOT-XeMeoQ&s" 
+           alt="NEXUS Logo" 
+           class="w-9 h-9 rounded-lg object-cover border border-[var(--teal-400)]/30"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-[var(--teal-400)] to-[var(--steel-600)] items-center justify-center font-display font-bold text-navy-950 text-sm" style="display:none;">N</div>
+      <div>
+        <p class="font-display font-semibold tracking-tight text-base sm:text-lg leading-none">NEXUS <span class="text-[var(--teal-300)]">SCM</span></p>
+        <p class="text-[10px] sm:text-xs text-[var(--ink-500)] tracking-widest uppercase">Centro de simulación gerencial</p>
+      <p class="text-[10px] sm:text-xs text-[var(--ink-500)] tracking-widest uppercase">Profesora: Dilsa González</p>
+      
+</div>
+    </div>
+    <div class="flex items-center gap-3 sm:gap-6">
+      <div class="text-right hidden xs:block">
+        <p class="text-[10px] uppercase tracking-widest text-[var(--ink-500)]">Día</p>
+        <p id="dayCounter" class="font-mono font-bold text-[var(--teal-300)] text-lg leading-none">01</p>
+      </div>
+      <div class="text-right hidden sm:block">
+        <p class="text-[10px] uppercase tracking-widest text-[var(--ink-500)]">Retos</p>
+        <p id="decisionCounter" class="font-mono font-bold text-lg leading-none">0/0</p>
+      </div>
+      <span class="flex items-center gap-1.5 text-[10px] sm:text-xs px-2.5 py-1 rounded-full bg-[var(--green-400)]/10 border border-[var(--green-400)]/30 text-[var(--green-400)]">
+        <span class="w-1.5 h-1.5 rounded-full bg-[var(--green-400)] pulse-dot"></span> EN VIVO
+      </span>
+    </div>
+  </div>
+  <!-- news ticker (visible only during crisis mission) -->
+  <div id="newsTicker" class="hidden bg-[var(--red-500)]/10 border-t border-[var(--red-500)]/30 overflow-hidden whitespace-nowrap py-1.5">
+    <div class="ticker-track inline-block font-mono text-[11px] text-[var(--red-500)] tracking-wide" id="tickerText">⚠ ÚLTIMA HORA — </div>
+  </div>
+</header>
+
+<!-- ============ KPI DASHBOARD ============ -->
+<section class="max-w-7xl mx-auto px-4 sm:px-6 pt-5">
+  <div id="kpiGrid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 sm:gap-3"></div>
+</section>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6" id="mainArea"></main>
+
+<!-- Toast container -->
+<div id="toastZone" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 w-[90vw] sm:w-80"></div>
+
+<!-- Event modal -->
+<div id="eventModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="panel rounded-2xl max-w-lg w-full p-6 border-2" style="border-color:var(--red-500);" id="eventModalBody"></div>
+</div>
+
+<!-- Map Info Modal -->
+<div id="mapInfoModal" class="hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="panel rounded-2xl max-w-sm w-full p-6 text-center border border-[var(--teal-400)]/30">
+    <span class="text-4xl block mb-3" id="mapInfoIcon">📍</span>
+    <h3 class="font-display text-lg font-semibold mb-2" id="mapInfoTitle">Ubicación</h3>
+    <p class="text-sm text-[var(--ink-300)] mb-4" id="mapInfoDesc">Selecciona una misión para operar en esta zona.</p>
+    <button onclick="document.getElementById('mapInfoModal').classList.add('hidden')" class="text-sm px-5 py-2 rounded-lg bg-[var(--teal-400)] text-navy-950 hover:bg-[var(--teal-300)] transition">Entendido</button>
+  </div>
+</div>
+
+<script>
+/* ====================================================================
+   ESTADO GLOBAL
+==================================================================== */
+const state = {
+  day: 1,
+  decisionsMade: 0,
+  totalDecisions: 0,
+  currentMissionIdx: null,
+  currentChallengeIdx: 0,
+  eventsTriggered: new Set(),
+  playerName: "",
+  introSeen: false,
+  log: [], // historial de decisiones para el reporte final
+  kpis: {
+    rentabilidad: { label:"Rentabilidad", color:"green", icon:"🟢", value:68, polarity:"high" },
+    servicio:     { label:"Nivel de Servicio", color:"blue", icon:"🔵", value:74, polarity:"high" },
+    inventario:   { label:"Inventario", color:"orange", icon:"🟠", value:66, polarity:"high" },
+    tiempo:       { label:"Tiempo", color:"purple", icon:"🟣", value:70, polarity:"high" },
+    riesgo:       { label:"Riesgo", color:"red", icon:"🔴", value:35, polarity:"low" },
+    satisfaccion: { label:"Satisfacción", color:"yellow", icon:"🟡", value:75, polarity:"high" },
+    huella:       { label:"Huella Ambiental", color:"gray", icon:"⚫", value:40, polarity:"low" },
+  }
+};
+const colorVar = {green:"var(--green-400)", blue:"var(--blue-400)", orange:"var(--orange-400)", purple:"var(--purple-400)", red:"var(--red-500)", yellow:"var(--yellow-400)", gray:"var(--gray-400)"};
+
+/* ====================================================================
+   MAPA AÉREO (8 ubicaciones, estilo GTA / SimCity)
+==================================================================== */
+const locations = [
+  {id:"planta", name:"Planta", icon:"🏭", x:120, y:90, desc:"Planta de producción principal"},
+  {id:"cd", name:"Centro de Distribución", icon:"🏢", x:290, y:60, desc:"Centro de distribución central"},
+  {id:"patio", name:"Patio de Camiones", icon:"🚚", x:430, y:120, desc:"Patio de maniobras y estacionamiento"},
+  {id:"picking", name:"Picking", icon:"📦", x:230, y:170, desc:"Zona de preparación de pedidos"},
+  {id:"aduanas", name:"Aduanas", icon:"🛃", x:520, y:200, desc:"Control aduanero y documentos"},
+  {id:"control", name:"Sala de Control", icon:"🖥️", x:370, y:230, desc:"Centro de monitoreo y control"},
+  {id:"financiera", name:"Oficina Financiera", icon:"📈", x:130, y:230, desc:"Gestión financiera y presupuestos"},
+  {id:"mundial", name:"Mapa Mundial", icon:"🌎", x:540, y:60, desc:"Visión global de operaciones"},
+];
+
+/* ====================================================================
+   MISIONES Y RETOS
+==================================================================== */
+const missions = [
+[
+  // ---------------- MISIÓN 1 ----------------
+  {
+    id:"m1", name:"El Desastre de la Demanda", icon:"📊", loc:"control",
+    intro:"El sistema de planeación enciende una alerta roja: la demanda real se disparó muy por encima de lo previsto. Tu primera misión: salvar el abastecimiento sin destruir la rentabilidad.",
+    challenges:[
+      { loc:"control", title:"El salto inesperado", context:"El dashboard muestra: Ventas ayer 150 unidades. Ventas hoy 470 unidades. Tu equipo espera instrucciones.", options:[
+        {label:"No hacer nada, esperar a que se confirme la tendencia", effects:{servicio:-10, inventario:+2, riesgo:+8}, feedback:"La inacción te cuesta tiempo valioso: el quiebre de stock se acerca."},
+        {label:"Aumentar producción de inmediato", effects:{servicio:+8, costos:0, rentabilidad:-3, riesgo:+4, tiempo:-2}, feedback:"Reaccionas rápido, aunque sin validar si es un pico puntual o una tendencia real."},
+        {label:"Comprar más materia prima antes de decidir producción", effects:{inventario:+6, rentabilidad:-2, tiempo:+1, riesgo:+2}, feedback:"Te aseguras insumos sin comprometer aún la capacidad productiva. Decisión prudente."},
+        {label:"Esperar una semana más para confirmar el patrón", effects:{servicio:-12, satisfaccion:-6, riesgo:+10}, feedback:"La espera prolongada deja a tus clientes sin producto en el peor momento."},
+      ]},
+      { loc:"aduanas", title:"El proveedor incumple", context:'Tu proveedor principal informa: "No puedo entregar por 12 días." Tu inventario de seguridad cubre apenas 5 días de operación.', options:[
+        {label:"Buscar un proveedor alterno de respaldo", effects:{inventario:+5, costos:-2, riesgo:-6, tiempo:-1}, feedback:"Activas tu red de respaldo: una práctica de gestión de riesgo bien ejecutada."},
+        {label:"Usar el inventario de seguridad sin buscar alternativas", effects:{servicio:-6, riesgo:+9, inventario:-10}, feedback:"El inventario de seguridad se agota antes de que el proveedor se recupere."},
+        {label:"Cancelar los pedidos afectados", effects:{satisfaccion:-9, servicio:-5, rentabilidad:-4}, feedback:"Evitas el caos operativo, pero pierdes ventas y confianza del cliente."},
+        {label:"Importar de emergencia con flete aéreo", effects:{servicio:+9, rentabilidad:-7, riesgo:-3}, feedback:"Resuelves el problema, a un costo logístico considerablemente alto."},
+      ]},
+      { loc:"financiera", title:"Construir el pronóstico", context:"Los datos históricos muestran una tendencia clara de crecimiento sostenido, con un repunte estacional cada fin de mes. Debes elegir el método de forecast más adecuado.", options:[
+        {label:"Promedio móvil simple (ignora estacionalidad)", effects:{inventario:-4, servicio:-3, riesgo:+3}, feedback:"El modelo es simple, pero no captura el patrón estacional: tu forecast subestima los picos."},
+        {label:"Suavización exponencial con ajuste estacional", effects:{inventario:+7, servicio:+5, tiempo:-1, riesgo:-4}, feedback:"Capturas tanto la tendencia como la estacionalidad: tu plan de abastecimiento mejora notablemente."},
+        {label:"Usar el mismo número del mes anterior, sin modelo", effects:{inventario:-7, servicio:-6, riesgo:+6}, feedback:"Sin un modelo formal, el forecast queda a la deriva frente a la variabilidad real."},
+      ]},
+      { loc:"control", title:"El efecto látigo (Bullwhip Effect)", context:"Cada eslabón de la cadena —cliente, distribuidor, fábrica, proveedor— está ajustando sus pedidos 'por si acaso', amplificando la variabilidad real de la demanda en cada nivel.", visual:"bullwhip", options:[
+        {label:"Compartir datos de demanda real (POS) con toda la cadena", effects:{riesgo:-9, inventario:+6, costos:0, tiempo:+2}, feedback:"La visibilidad compartida reduce drásticamente la amplificación del efecto látigo."},
+        {label:"Pedir a cada eslabón que arme su propio inventario de seguridad", effects:{riesgo:+8, inventario:-5, rentabilidad:-3}, feedback:"Cada nivel sobre-reacciona de forma independiente: el efecto látigo se intensifica."},
+        {label:"Ignorar el fenómeno y seguir operando igual", effects:{riesgo:+6, servicio:-4}, feedback:"La variabilidad sigue creciendo aguas arriba sin que nadie la controle."},
+      ]},
+      { loc:"financiera", title:"Mesa de negociación S&OP", context:"Ventas quiere producir más para no perder ninguna venta. Finanzas exige contener el capital de trabajo. Producción advierte que no tiene capacidad para todo. Debes liderar el consenso.", options:[
+        {label:"Construir un plan único S&OP balanceando los tres frentes con datos", effects:{rentabilidad:+5, servicio:+4, riesgo:-5, tiempo:-1}, feedback:"El proceso S&OP bien liderado alinea a la organización detrás de un solo número."},
+        {label:"Dar prioridad total a la propuesta de Ventas", effects:{servicio:+6, rentabilidad:-6, inventario:-4}, feedback:"El servicio mejora, pero el capital de trabajo y el costo se disparan."},
+        {label:"Dar prioridad total a la propuesta de Finanzas", effects:{rentabilidad:+5, servicio:-7, satisfaccion:-3}, feedback:"Proteges el flujo de caja, sacrificando ventas y satisfacción del cliente."},
+      ]},
+      { loc:"cd", title:"El cliente VIP", context:"Solo queda inventario suficiente para atender a un cliente. Tienes tres opciones: tu cliente más grande (bajo margen, alto volumen), un cliente nuevo estratégico (alto potencial), o un cliente fiel de 10 años (margen medio).", options:[
+        {label:"Despachar al cliente más grande por volumen", effects:{rentabilidad:-2, satisfaccion:+3, servicio:+5}, feedback:"Proteges el volumen de facturación, aunque el margen de esta venta es bajo."},
+        {label:"Despachar al cliente fiel de 10 años", effects:{satisfaccion:+8, rentabilidad:+2, servicio:+2}, feedback:"Fortaleces una relación de largo plazo basada en lealtad mutua."},
+        {label:"Despachar al cliente nuevo estratégico", effects:{rentabilidad:+4, riesgo:+2, satisfaccion:-3}, feedback:"Apuestas por el potencial futuro, arriesgando la relación con clientes actuales."},
+      ]},
+      { loc:"picking", title:"Rotura de inventario", context:"El SKU estrella llegó a cero unidades en plena temporada alta. El área comercial exige una solución inmediata.", options:[
+        {label:"Transferir inventario desde otra bodega de la red", effects:{servicio:+7, tiempo:-2, costos:0, inventario:+3}, feedback:"Usas la red de bodegas de forma inteligente para cubrir el faltante."},
+        {label:"Producción de emergencia en turno extra", effects:{servicio:+6, rentabilidad:-4, tiempo:-1}, feedback:"Resuelves el faltante a costa de un sobrecosto operativo significativo."},
+        {label:"Informar al cliente que debe esperar", effects:{satisfaccion:-8, servicio:-6}, feedback:"La transparencia es valiosa, pero no sustituye la solución del problema."},
+      ]},
+      { loc:"aduanas", title:"Proveedor incumple por segunda vez", context:"El mismo proveedor que falló antes vuelve a retrasarse, esta vez sin previo aviso, comprometiendo dos líneas de producción.", options:[
+        {label:"Activar penalidad contractual y exigir plan de recuperación", effects:{riesgo:-5, rentabilidad:+2, tiempo:-1}, feedback:"Usas las cláusulas contractuales como palanca para corregir el comportamiento del proveedor."},
+        {label:"Iniciar de inmediato proceso de homologación de un nuevo proveedor", effects:{riesgo:-8, costos:0, tiempo:-3, inventario:+2}, feedback:"Reduces la dependencia de un proveedor poco confiable, aunque toma tiempo."},
+        {label:"Aceptar la situación y ajustar el plan de producción", effects:{servicio:-6, riesgo:+5}, feedback:"Te adaptas, pero no corriges el riesgo estructural de fondo."},
+      ]},
+      { loc:"financiera", title:"Promoción inesperada", context:"Marketing lanza una promoción agresiva sin avisar a la cadena de suministro. La demanda se duplica en 48 horas.", options:[
+        {label:"Activar protocolo de respuesta rápida con 3PL de respaldo", effects:{servicio:+8, costos:0, rentabilidad:-2, tiempo:+2}, feedback:"La capacidad externa te permite capturar la demanda sin colapsar la red."},
+        {label:"Exigir a Marketing que coordine antes de futuras promociones", effects:{riesgo:-4, satisfaccion:-1, tiempo:+1}, feedback:"Corriges el problema de raíz para el futuro, aunque no resuelve la presión de hoy."},
+        {label:"Dejar que la red opere al límite sin refuerzos", effects:{servicio:-9, satisfaccion:-6, riesgo:+6}, feedback:"La falta de coordinación interna termina perjudicando al cliente final."},
+      ]},
+      { loc:"control", title:"Verificación de conceptos", context:"Antes de cerrar la misión, el sistema evalúa si comprendes los fundamentos detrás de tus decisiones. ¿Qué describe mejor el 'efecto látigo' (Bullwhip Effect)?", options:[
+        {label:"La amplificación de la variabilidad de la demanda a medida que la información sube por la cadena de suministro", effects:{riesgo:-4, tiempo:+1}, feedback:"Correcto. Cada eslabón distorsiona la señal de demanda real, generando sobre-reacciones."},
+        {label:"La reducción de costos logísticos por economías de escala", effects:{riesgo:+3}, feedback:"Esa definición corresponde a otro concepto. El efecto látigo se refiere a la distorsión de la demanda."},
+        {label:"El tiempo que tarda un pedido en llegar al cliente final", effects:{riesgo:+3}, feedback:"Esa es la definición de Lead Time, no del efecto látigo."},
+      ]},
+    ]
+  },
+],
+[
+  // ---------------- MISIÓN 2 ----------------
+  {
+    id:"m2", name:"El Centro de Distribución", icon:"🏢", loc:"cd",
+    intro:"Bajas literalmente al piso de operación. Montacargas en movimiento, escáneres pitando, pallets esperando ubicación. Aquí cada decisión física tiene consecuencias inmediatas.",
+    challenges:[
+      { loc:"patio", title:"Recepción de mercancía", context:"Llega un camión con 40 pallets. El conductor presiona para descargar rápido y seguir su ruta; el protocolo exige inspección completa.", options:[
+        {label:"Realizar inspección completa antes de aceptar la carga", effects:{riesgo:-7, tiempo:-2, inventario:+3}, feedback:"La inspección rigurosa previene que productos dañados entren al inventario."},
+        {label:"Aceptar la carga sin inspección para no demorar al transportista", effects:{riesgo:+8, inventario:-2}, feedback:"Ahorras tiempo hoy, pero abres la puerta a reclamos de calidad después."},
+      ]},
+      { loc:"patio", title:"Asignación de muelles", context:"Tres camiones llegan al mismo tiempo: uno con producto perecedero, uno con carga general y uno con devoluciones.", options:[
+        {label:"Priorizar el muelle para el camión de producto perecedero", effects:{servicio:+5, riesgo:-4, tiempo:-1}, feedback:"Proteges la calidad del producto sensible al tiempo y a la temperatura."},
+        {label:"Asignar por orden de llegada sin diferenciar tipo de carga", effects:{riesgo:+5, servicio:-2}, feedback:"Tratar toda la carga igual ignora el riesgo diferencial de cada tipo de producto."},
+      ]},
+      { loc:"picking", title:"Revisión de daños", context:"Al destapar un pallet encuentras cajas con golpes visibles. Reportarlo retrasa la operación de descarga del turno.", options:[
+        {label:"Reportar el daño formalmente y separar el lote", effects:{riesgo:-6, inventario:+2, tiempo:-1}, feedback:"El reporte oportuno evita que producto defectuoso llegue al cliente final."},
+        {label:"Ubicar el lote sin reportar, para no atrasar la meta del turno", effects:{riesgo:+9, satisfaccion:-4}, feedback:"El problema queda oculto hasta que explota como una reclamación del cliente."},
+      ]},
+      { loc:"picking", title:"Escaneo de códigos QR", context:"El sistema exige escanear cada unidad antes de ubicarla, lo que reduce el ritmo de la cuadrilla en un día de alta demanda.", options:[
+        {label:"Mantener el escaneo del 100% de las unidades", effects:{inventario:+6, riesgo:-4, tiempo:-2}, feedback:"La trazabilidad completa cuesta tiempo hoy, pero evita errores costosos después."},
+        {label:"Escanear solo una muestra para ganar velocidad", effects:{tiempo:+3, inventario:-6, riesgo:+5}, feedback:"Ganas velocidad, pero la precisión del inventario se deteriora silenciosamente."},
+      ]},
+      { loc:"picking", title:"Ubicación ABC", context:"Debes decidir dónde ubicar los productos de mayor rotación (categoría A) dentro de la bodega.", options:[
+        {label:"Ubicar los productos A cerca de las zonas de despacho", effects:{tiempo:+6, costos:0, servicio:+3}, feedback:"Reduces los recorridos de picking para los productos que más se mueven."},
+        {label:"Ubicar los productos A en zonas alejadas, junto a los de baja rotación", effects:{tiempo:-6, servicio:-3}, feedback:"Los operarios recorren más distancia de la necesaria para los pedidos más frecuentes."},
+      ]},
+      { loc:"picking", title:"FIFO vs FEFO", context:"Llega un lote nuevo de un producto perecedero, mientras aún queda inventario antiguo del mismo SKU con fecha de vencimiento próxima.", options:[
+        {label:"Aplicar FEFO (primero en vencer, primero en salir)", effects:{inventario:+5, riesgo:-5, satisfaccion:+2}, feedback:"Para productos perecederos, FEFO es la práctica correcta: minimiza mermas por vencimiento."},
+        {label:"Aplicar FIFO simple, ignorando fechas de vencimiento", effects:{riesgo:+6, inventario:-4}, feedback:"FIFO funciona para muchos productos, pero no protege contra el vencimiento real."},
+      ]},
+      { loc:"picking", title:"Cadena de frío en riesgo", context:"Un operario nuevo ubica una caja de medicamentos en una zona ambiente, cuando el producto requiere conservarse a 25°C controlados.", visual:"alerta", options:[
+        {label:"Detectar el error a tiempo y reubicar en zona refrigerada", effects:{riesgo:-8, rentabilidad:+1, servicio:+2}, feedback:"La verificación cruzada evita la pérdida del lote y protege la seguridad del paciente final."},
+        {label:"No revisar la ubicación; el sistema ya lo dio por almacenado", effects:{rentabilidad:-9, riesgo:+12, satisfaccion:-5}, feedback:"ALERTA: cadena de frío perdida. Pérdida estimada de $40.000 en el lote afectado."},
+      ]},
+      { loc:"patio", title:"Cross-docking y carga del camión", context:"Un pedido urgente puede saltar el almacenamiento e ir directo del muelle de recepción al de despacho (cross-docking), pero requiere coordinación perfecta de tiempos.", options:[
+        {label:"Coordinar cross-docking sincronizado con el camión de salida", effects:{tiempo:+7, costos:0, servicio:+5}, feedback:"Ejecutas una operación de cross-docking impecable, ahorrando tiempo y espacio de almacenaje."},
+        {label:"Almacenar primero y despachar en el siguiente ciclo normal", effects:{tiempo:-4, servicio:-2}, feedback:"Pierdes la ventana de oportunidad de una operación más ágil y económica."},
+      ]},
+    ]
+  },
+],
+[
+  // ---------------- MISIÓN 3 ----------------
+  {
+    id:"m3", name:"Costos y Rentabilidad", icon:"📈", loc:"financiera",
+    intro:"Aquí todo tiene precio. Cada movimiento, cada decisión de transporte, cada exceso de producción consume presupuesto real. Bienvenido a la oficina financiera de la cadena de suministro.",
+    challenges:[
+      { loc:"financiera", title:"Costeo ABC", context:"El reporte de costos tradicional reparte los gastos indirectos de forma uniforme entre todos los productos, distorsionando la rentabilidad real de cada línea.", options:[
+        {label:"Implementar costeo ABC para asignar costos según actividades reales", effects:{rentabilidad:+6, tiempo:-1}, feedback:"Ahora sabes exactamente qué productos son realmente rentables y cuáles no."},
+        {label:"Mantener el reparto uniforme actual", effects:{rentabilidad:-3, riesgo:+2}, feedback:"Sigues tomando decisiones comerciales con información de costos distorsionada."},
+      ]},
+      { loc:"financiera", title:"Costo por pedido", context:"Muchos clientes pequeños hacen pedidos frecuentes de bajo volumen, multiplicando el costo logístico por unidad despachada.", options:[
+        {label:"Establecer un pedido mínimo y consolidar envíos", effects:{rentabilidad:+5, satisfaccion:-2, costos:0}, feedback:"Mejoras la rentabilidad por pedido, aunque algunos clientes deben ajustar su frecuencia de compra."},
+        {label:"Mantener la política de pedidos sin mínimo", effects:{rentabilidad:-4, satisfaccion:+1}, feedback:"Mantienes flexibilidad comercial a cambio de un costo logístico estructuralmente alto."},
+      ]},
+      { loc:"financiera", title:"Punto de equilibrio", context:"Estás evaluando si vale la pena aceptar un pedido grande con margen reducido pero que ayuda a cubrir costos fijos de la planta.", options:[
+        {label:"Aceptar el pedido: ayuda a superar el punto de equilibrio del mes", effects:{rentabilidad:+3, riesgo:+1, tiempo:-1}, feedback:"El volumen adicional diluye los costos fijos, mejorando el resultado neto del periodo."},
+        {label:"Rechazar el pedido por margen insuficiente", effects:{rentabilidad:-2, riesgo:-1}, feedback:"Proteges el margen promedio, aunque dejas capacidad ociosa sin cubrir costos fijos."},
+      ]},
+      { loc:"financiera", title:"Flujo de caja", context:"Un proveedor ofrece un 3% de descuento por pago anticipado a 10 días, en vez de los 60 días habituales de crédito.", options:[
+        {label:"Tomar el descuento pagando anticipado (si hay caja disponible)", effects:{rentabilidad:+4, riesgo:+1}, feedback:"El descuento por pago anticipado suele superar el costo de oportunidad del capital."},
+        {label:"Mantener el plazo de 60 días para preservar liquidez", effects:{rentabilidad:-2, riesgo:-2}, feedback:"Preservas caja disponible, renunciando a una mejora directa de margen."},
+      ]},
+      { loc:"financiera", title:"ROI de automatización", context:"Te proponen invertir en un sistema de picking automatizado con retorno estimado en 18 meses.", options:[
+        {label:"Aprobar la inversión con un caso de negocio sólido", effects:{tiempo:+5, rentabilidad:+3, costos:0, huella:-3}, feedback:"La automatización mejora la productividad estructural de la bodega a mediano plazo."},
+        {label:"Posponer la inversión por restricciones de presupuesto", effects:{tiempo:-2, rentabilidad:-1}, feedback:"Evitas el desembolso inmediato, pero retrasas una mejora de productividad necesaria."},
+      ]},
+      { loc:"financiera", title:"Tercerización (Outsourcing)", context:"Evalúas si la operación de bodega debe seguir siendo propia o pasar a un operador logístico externo (3PL).", options:[
+        {label:"Tercerizar la bodega con un 3PL especializado", effects:{rentabilidad:+4, riesgo:+2, servicio:+2}, feedback:"Ganas flexibilidad y expertise especializado, a cambio de menor control directo."},
+        {label:"Mantener la operación propia (insourcing)", effects:{riesgo:-2, rentabilidad:-1, servicio:+1}, feedback:"Conservas control total de la operación, asumiendo toda la estructura de costos fijos."},
+      ]},
+      { loc:"financiera", title:"Presupuesto bajo presión", context:"El CFO solicita un recorte del 10% en el presupuesto logístico del trimestre para mejorar el flujo de caja corporativo.", options:[
+        {label:"Proponer un plan de eficiencias operativas en vez de un recorte ciego", effects:{rentabilidad:+5, servicio:+1, tiempo:+1}, feedback:"Tu argumento basado en datos convence al CFO de una vía más sostenible que cortar a ciegas."},
+        {label:"Aceptar el recorte reduciendo el inventario de seguridad", effects:{rentabilidad:+4, inventario:-7, riesgo:+5}, feedback:"Cumples la meta financiera, exponiendo la operación a un mayor riesgo de quiebre."},
+      ]},
+    ]
+  },
+],
+[
+  // ---------------- MISIÓN 4 (CRISIS MUNDIAL) ----------------
+  {
+    id:"m4", name:"Crisis Mundial", icon:"🌎", loc:"mundial",
+    intro:"El mapa mundial se ilumina con alertas. Las noticias no dejan de llegar. Cada minuto cambia el escenario y el CEO espera respuestas claras.",
+    crisis:true,
+    challenges:[
+      { loc:"mundial", news:"🌍 Terremoto de magnitud 7.2 afecta la región donde opera tu planta secundaria", title:"Terremoto en zona productiva", context:"La planta secundaria queda fuera de operación de forma indefinida. El 30% de tu capacidad productiva está comprometida.", options:[
+        {label:"Redistribuir producción a las plantas restantes en triple turno", effects:{servicio:+5, rentabilidad:-4, tiempo:-1}, feedback:"Cubres parte del déficit con la capacidad disponible, a un costo operativo mayor."},
+        {label:"Activar capacidad de maquila externa de respaldo", effects:{servicio:+7, rentabilidad:-3, riesgo:-3}, feedback:"La red de respaldo previamente homologada responde rápido ante la crisis."},
+        {label:"Esperar la evaluación de daños antes de actuar", effects:{servicio:-9, satisfaccion:-5, riesgo:+6}, feedback:"La espera prolonga el desabasto en un momento crítico para tus clientes."},
+      ]},
+      { loc:"mundial", news:"⚓ El puerto principal de importación cierra por contingencia sanitaria", title:"Puerto cerrado", context:"Tres contenedores con materia prima crítica quedan varados sin fecha de liberación.", options:[
+        {label:"Redirigir la carga a un puerto alterno y ajustar el transporte terrestre", effects:{tiempo:-2, costos:0, riesgo:-5, servicio:+3}, feedback:"El plan de contingencia portuaria evita una parálisis total del abastecimiento."},
+        {label:"Esperar la reapertura del puerto original", effects:{servicio:-8, riesgo:+7}, feedback:"La espera pasiva te deja sin materia prima durante un periodo crítico."},
+      ]},
+      { loc:"mundial", news:"🚫 Sindicato de transportistas anuncia huelga nacional indefinida", title:"Huelga de transporte", context:"El 60% de tu flota de distribución terrestre queda detenida desde esta madrugada.", options:[
+        {label:"Activar transportadoras alternas no sindicalizadas bajo contrato spot", effects:{costos:0, rentabilidad:-3, servicio:+6}, feedback:"Mantienes el flujo de distribución, asumiendo un sobrecosto temporal de transporte."},
+        {label:"Priorizar solo despachos críticos mientras dura la huelga", effects:{servicio:-3, satisfaccion:-2, rentabilidad:+1}, feedback:"Reduces el impacto financiero, sacrificando parte del nivel de servicio general."},
+      ]},
+      { loc:"mundial", news:"🚢 Canal interoceánico clave reporta congestión severa: demoras de hasta 12 días", title:"Canal congestionado", context:"Tus importaciones programadas para esta semana se retrasarán significativamente si no cambias de ruta.", options:[
+        {label:"Cambiar la ruta marítima por una alternativa más larga pero fluida", effects:{tiempo:-1, costos:0, riesgo:-4, servicio:+2}, feedback:"La ruta alterna cuesta algo más de tiempo de tránsito, pero evita la congestión total."},
+        {label:"Mantener la ruta original y absorber la demora", effects:{servicio:-6, riesgo:+5}, feedback:"Asumes el riesgo de un retraso impredecible que puede extenderse aún más."},
+      ]},
+      { loc:"mundial", news:"☣️ Brote sanitario reduce la disponibilidad de personal operativo en un 25%", title:"Pandemia regional", context:"La planta y la bodega operan con personal reducido por protocolos de bioseguridad.", options:[
+        {label:"Activar protocolos de bioseguridad y turnos rotativos escalonados", effects:{tiempo:-2, riesgo:-6, satisfaccion:+1}, feedback:"Proteges a tu personal y mantienes operación parcial de forma responsable."},
+        {label:"Mantener operación normal sin ajustes adicionales", effects:{riesgo:+9, servicio:-3}, feedback:"El riesgo de un brote mayor dentro de la operación aumenta considerablemente."},
+      ]},
+      { loc:"mundial", news:"💻 Ataque de ransomware compromete los servidores del sistema WMS corporativo", title:"Ataque cibernético", context:"El sistema de gestión de bodega queda bloqueado. No hay visibilidad de inventario en tiempo real.", options:[
+        {label:"Activar protocolo manual de respaldo y aislar la red comprometida", effects:{tiempo:-3, riesgo:-7, inventario:+2}, feedback:"La contención rápida evita una propagación mayor del incidente de ciberseguridad."},
+        {label:"Mantener los sistemas conectados mientras TI investiga", effects:{riesgo:+10, inventario:-4}, feedback:"El ataque puede propagarse a otros sistemas críticos de la operación."},
+      ]},
+      { loc:"mundial", news:"📈 Una tendencia viral global dispara la demanda de tu producto insignia en 250%", title:"Demanda aumentó 250%", context:"Es una oportunidad histórica de ventas, pero la red actual no fue diseñada para este volumen.", options:[
+        {label:"Activar capacidad logística externa (3PL) y priorizar mercados clave", effects:{rentabilidad:+6, servicio:+5, costos:0}, feedback:"Capturas una oportunidad comercial extraordinaria sin colapsar tu red logística."},
+        {label:"Limitar las ventas para no comprometer el servicio actual", effects:{rentabilidad:-5, satisfaccion:-2, servicio:+3}, feedback:"Proteges la operación actual, dejando ingresos significativos sobre la mesa."},
+      ]},
+      { loc:"mundial", news:"📞 El CEO solicita una explicación inmediata del impacto de la crisis en los resultados", title:"Responder al CEO", context:"Debes presentar, en una sola frase ejecutiva, cómo está gestionando la cadena de suministro la crisis actual.", options:[
+        {label:"Presentar el plan de mitigación con impacto cuantificado en KPIs", effects:{riesgo:-3, rentabilidad:+2, satisfaccion:+1}, feedback:"Una comunicación clara y basada en datos genera confianza en el liderazgo ejecutivo."},
+        {label:"Minimizar la gravedad de la situación para evitar preocupación", effects:{riesgo:+5, satisfaccion:-2}, feedback:"La falta de transparencia puede costarte credibilidad cuando los resultados se conozcan."},
+      ]},
+    ]
+  },
+],
+[
+  // ---------------- MISIÓN 5 ----------------
+  {
+    id:"m5", name:"Director Global SCM", icon:"🖥️", loc:"control",
+    intro:"Has llegado a la Sala de Control global. Dashboards en tiempo real, mapas mundiales, alertas constantes. Ya no gestionas una bodega: diriges toda la cadena de suministro.",
+    challenges:[
+      { loc:"control", title:"OTIF y Fill Rate en caída", context:"El indicador OTIF (On Time In Full) cayó al 81% y el Fill Rate al 88% en el último trimestre, por debajo de la meta corporativa del 95%.", options:[
+        {label:"Implementar un programa de mejora continua con causa raíz por cliente", effects:{servicio:+7, riesgo:-3, tiempo:-1}, feedback:"Atacar la causa raíz por segmento de cliente mejora el OTIF de forma sostenible."},
+        {label:"Presionar a los transportistas para acelerar entregas sin analizar causas", effects:{servicio:+2, riesgo:+3, satisfaccion:-1}, feedback:"La mejora es marginal y temporal porque no se atacó la causa estructural."},
+      ]},
+      { loc:"control", title:"Adopción tecnológica", context:"El comité directivo te pide priorizar una inversión tecnológica entre Blockchain para trazabilidad, RFID para inventario en tiempo real, o IA predictiva para forecast.", options:[
+        {label:"Priorizar IA predictiva para mejorar la exactitud del forecast", effects:{inventario:+6, rentabilidad:+3, riesgo:-3}, feedback:"La precisión de pronóstico mejora directamente tus decisiones de inventario y producción."},
+        {label:"Priorizar RFID para visibilidad de inventario en tiempo real", effects:{inventario:+8, tiempo:+2, costos:0}, feedback:"Ganas visibilidad granular del inventario en toda la red de bodegas."},
+        {label:"Priorizar Blockchain para trazabilidad extremo a extremo", effects:{riesgo:-6, satisfaccion:+3, rentabilidad:-1}, feedback:"Fortaleces la confianza del cliente y la trazabilidad regulatoria, con beneficio financiero más indirecto."},
+      ]},
+      { loc:"control", title:"Modelo SCOR como marco de gestión", context:"Quieres estandarizar la gestión de la cadena bajo el modelo SCOR (Plan, Source, Make, Deliver, Return) para toda la organización.", options:[
+        {label:"Implementar SCOR con KPIs estandarizados por proceso", effects:{riesgo:-5, tiempo:+3, rentabilidad:+2}, feedback:"La estandarización por procesos mejora la comparabilidad y la gestión del desempeño global."},
+        {label:"Mantener indicadores propios de cada país/región sin estandarizar", effects:{riesgo:+4, tiempo:-1}, feedback:"La falta de un lenguaje común dificulta comparar y mejorar el desempeño global."},
+      ]},
+      { loc:"control", title:"Balanced Scorecard (BSC) corporativo", context:"Debes definir si el BSC de la cadena de suministro se enfoca solo en costo, o en una visión balanceada de perspectivas.", options:[
+        {label:"Construir un BSC balanceado: financiera, cliente, procesos y aprendizaje", effects:{rentabilidad:+3, satisfaccion:+3, riesgo:-3}, feedback:"La visión balanceada evita optimizar una sola dimensión a costa de las demás."},
+        {label:"Enfocar el BSC exclusivamente en reducción de costos", effects:{rentabilidad:+4, satisfaccion:-4, servicio:-3}, feedback:"El ahorro de corto plazo se logra, pero a costa del servicio y la experiencia del cliente."},
+      ]},
+      { loc:"mundial", news:"⚠️ Última crisis del turno: cliente estratégico amenaza con cancelar el contrato global", title:"La decisión final", context:"Tu cliente más importante (22% de la facturación global) exige un plan de recuperación de servicio en 48 horas o cancela el contrato.", options:[
+        {label:"Presentar un plan de recuperación con SLA reforzado y seguimiento diario", effects:{satisfaccion:+10, servicio:+6, rentabilidad:+2}, feedback:"Tu liderazgo directo en la crisis salva la relación comercial más importante de la compañía."},
+        {label:"Delegar la negociación al equipo comercial sin involucrarte", effects:{satisfaccion:-8, riesgo:+5}, feedback:"La falta de involucramiento directo del Director SCM se interpreta como falta de compromiso."},
+      ]},
+      { loc:"control", title:"Cierre del mandato", context:"Tu turno como Director Global de Supply Chain está llegando a su fin. Es momento de consolidar el legado de tu gestión.", options:[
+        {label:"Documentar lecciones aprendidas y dejar un plan de continuidad", effects:{riesgo:-4, tiempo:+1, rentabilidad:+1}, feedback:"Dejas una operación más resiliente y preparada para el siguiente líder."},
+        {label:"Cerrar el periodo sin documentar el conocimiento generado", effects:{riesgo:+3}, feedback:"El conocimiento adquirido durante la crisis se pierde con tu salida."},
+      ]},
+    ]
+  },
+]
+];
+
+/* Eventos aleatorios de fondo (pueden aparecer en cualquier misión, excepto la de crisis) */
+const randomEvents = [
+  {id:"contenedor", title:"Contenedor retenido en aduanas", desc:"Un contenedor con mercancía crítica queda retenido para inspección sin fecha definida de liberación.",
+    options:[ {label:"Asignar un agente aduanero dedicado para acelerar el trámite", effects:{tiempo:-1, riesgo:-4, costos:0}},
+              {label:"Esperar el proceso regular de aduanas", effects:{servicio:-5, riesgo:+4}} ]},
+  {id:"wms", title:"Sistema WMS fuera de servicio", desc:"El sistema de gestión de bodega cae por mantenimiento no programado durante el pico de despachos.",
+    options:[ {label:"Activar el protocolo manual de respaldo previamente capacitado", effects:{tiempo:+2, servicio:+4} },
+              {label:"Detener despachos hasta restaurar el sistema", effects:{servicio:-7, tiempo:-3} } ]},
+  {id:"cancela", title:"Cliente cancela un pedido grande", desc:"Un cliente importante cancela de último momento un pedido equivalente al 8% de la facturación del mes.",
+    options:[ {label:"Reasignar el inventario liberado a otros clientes con demanda pendiente", effects:{rentabilidad:+2, inventario:+3} },
+              {label:"Dejar el inventario reservado por si el cliente reconsidera", effects:{rentabilidad:-3, inventario:-3} } ]},
+  {id:"montacargas", title:"Montacargas averiado", desc:"Uno de los montacargas principales se avería a mitad de turno, reduciendo la capacidad de movimiento de mercancía.",
+    options:[ {label:"Rentar un equipo temporal de respaldo", effects:{costos:0, tiempo:+3, rentabilidad:-1} },
+              {label:"Redistribuir la carga de trabajo entre los equipos restantes", effects:{tiempo:-2, riesgo:+1} } ]},
+  {id:"contaminado", title:"Producto contaminado detectado", desc:"Control de calidad detecta un lote contaminado ya ubicado en bodega.",
+    options:[ {label:"Activar recall interno inmediato y aislar el lote completo", effects:{riesgo:-8, rentabilidad:-2, satisfaccion:+2} },
+              {label:"Retirar solo las unidades visiblemente afectadas", effects:{riesgo:+6, satisfaccion:-3} } ]},
+  {id:"errorinv", title:"Error de inventario detectado", desc:"Una auditoría cíclica revela una diferencia del 6% entre el inventario físico y el del sistema.",
+    options:[ {label:"Realizar un recuento físico completo inmediato", effects:{inventario:+7, tiempo:-2} },
+              {label:"Ajustar el sistema al conteo más reciente sin recuento físico", effects:{inventario:-4, riesgo:+3} } ]},
+  {id:"corte", title:"Corte eléctrico en la bodega", desc:"Un corte de energía no programado detiene los equipos automatizados de la bodega por varias horas.",
+    options:[ {label:"Activar la planta eléctrica de respaldo", effects:{tiempo:+3, costos:0} },
+              {label:"Pausar la operación hasta que se restaure el suministro", effects:{tiempo:-5, servicio:-3} } ]},
+  {id:"lluvias", title:"Lluvias bloquean una ruta clave", desc:"Lluvias intensas bloquean la vía principal hacia uno de tus centros de distribución regionales.",
+    options:[ {label:"Activar una ruta alterna previamente mapeada", effects:{tiempo:-1, servicio:+4, costos:0} },
+              {label:"Esperar a que la vía se despeje de forma natural", effects:{servicio:-6, tiempo:-3} } ]},
+  {id:"inspeccion", title:"Inspección sanitaria sorpresa", desc:"Una autoridad sanitaria realiza una inspección sin previo aviso en la planta de producción.",
+    options:[ {label:"Recibir la inspección con la documentación y protocolos al día", effects:{riesgo:-5, satisfaccion:+1} },
+              {label:"Intentar posponer la inspección con excusas operativas", effects:{riesgo:+7, satisfaccion:-2} } ]},
+];
+
+/* ====================================================================
+   UTILIDADES KPI
+==================================================================== */
+function kpiColor(k){
+  const v = k.value;
+  if(k.polarity==="low"){
+    if(v<=30) return "var(--green-400)";
+    if(v<=55) return "var(--amber-400)";
+    return "var(--red-500)";
+  }
+  if(v>=75) return "var(--green-400)";
+  if(v>=50) return "var(--amber-400)";
+  return "var(--red-500)";
+}
+function clamp(v){ return Math.max(0, Math.min(100, v)); }
+function applyEffects(effects){
+  Object.entries(effects).forEach(([key,delta])=>{
+    if(!state.kpis[key]) return;
+    state.kpis[key].value = clamp(state.kpis[key].value + delta);
+  });
+}
+function renderKpis(){
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = "";
+  Object.values(state.kpis).forEach(k=>{
+    const color = kpiColor(k);
+    const fillPct = k.polarity==="low" ? clamp(100-k.value) : clamp(k.value);
+    grid.innerHTML += `
+      <div class="panel rounded-xl p-2.5 sm:p-3">
+        <p class="text-[10px] sm:text-[11px] text-[var(--ink-300)] flex items-center gap-1 mb-1.5 truncate"><span>${k.icon}</span>${k.label}</p>
+        <div class="flex items-end justify-between mb-1.5">
+          <span class="font-mono font-bold text-base sm:text-lg" style="color:${color}">${Math.round(k.value)}</span>
+          <span class="font-mono text-[9px] text-[var(--ink-500)]">${k.polarity==="low"?"nivel":"/100"}</span>
+        </div>
+        <div class="kpi-bar"><div class="kpi-fill" style="width:${fillPct}%; background:${color};"></div></div>
+      </div>`;
+  });
+}
+
+/* ====================================================================
+   NAVEGACIÓN PRINCIPAL
+==================================================================== */
+function totalChallenges(){ return missions.flat()[0] ? missions.reduce((a,m)=>a+m[0].challenges.length,0) : 0; }
+function doneChallenges(){ return missions.reduce((a,m)=>a+m[0].challenges.filter(c=>c.done).length,0); }
+function updateHeaderCounters(){
+  state.totalDecisions = totalChallenges();
+  document.getElementById('decisionCounter').textContent = `${doneChallenges()}/${state.totalDecisions}`;
+}
+
+function goToMap(){
+  document.getElementById('newsTicker').classList.add('hidden');
+  renderIntroOrMap();
+}
+
+function renderIntroOrMap(){
+  if(!state.introSeen){ renderCinematicIntro(); }
+  else { renderMissionHub(); }
+}
+
+/* ---------- INTRO CINEMÁTICA ---------- */
+function renderCinematicIntro(){
+  const main = document.getElementById('mainArea');
+  main.innerHTML = `
+    <div class="panel rounded-2xl p-6 sm:p-10 relative overflow-hidden max-w-3xl mx-auto fade-in">
+      <div class="scanline rounded-2xl"></div>
+      <div class="relative font-mono text-[var(--teal-300)] text-xs sm:text-sm space-y-1.5 mb-6" id="cineLines"></div>
+      <div id="introCta" class="hidden mt-6 text-center">
+        <button onclick="state.introSeen=true; renderMissionHub();" class="text-sm font-medium px-6 py-3 rounded-lg bg-[var(--teal-400)] text-navy-950 hover:bg-[var(--teal-300)] transition">Entrar al mapa de operación →</button>
+      </div>
+    </div>`;
+  const lines = [
+    "🔊 [suena un montacargas a la distancia... camiones entrando al patio...]",
+    "🔊 [murmullo de operarios coordinando una recepción]",
+    "",
+    "&gt; Bienvenido.",
+    "&gt; Hoy empiezas como Gerente de Supply Chain.",
+    "",
+    "&gt; La empresa tiene:",
+    "&nbsp;&nbsp;✔ 5 bodegas",
+    "&nbsp;&nbsp;✔ 3 plantas",
+    "&nbsp;&nbsp;✔ 24 proveedores",
+    "&nbsp;&nbsp;✔ 18 rutas",
+    "&nbsp;&nbsp;✔ clientes esperando sus pedidos",
+    "",
+    "&gt; Pero hay problemas.",
+    "&gt; Si tomas malas decisiones...",
+    "&nbsp;&nbsp;✕ pierdes dinero",
+    "&nbsp;&nbsp;✕ pierdes clientes",
+    "&nbsp;&nbsp;✕ pierdes inventario",
+    "&nbsp;&nbsp;✕ incluso puedes ser despedido",
+  ];
+  const cine = document.getElementById('cineLines');
+  lines.forEach((l,i)=>{
+    const div = document.createElement('div');
+    div.className = "typeline";
+    div.style.animationDelay = (i*0.28)+"s";
+    div.innerHTML = l || "&nbsp;";
+    cine.appendChild(div);
+  });
+  setTimeout(()=>{ document.getElementById('introCta').classList.remove('hidden'); document.getElementById('introCta').classList.add('fade-in'); }, lines.length*280 + 400);
+}
+
+/* ---------- MAPA AÉREO + SELECCIÓN DE MISIONES ---------- */
+function renderMissionHub(){
+  const main = document.getElementById('mainArea');
+  
+  // Generar botones interactivos para las ubicaciones
+  const locationButtons = locations.map(loc => `
+    <button onclick="showLocationInfo('${loc.id}')" class="map-location-btn rounded-xl p-2.5 text-center min-w-[70px] flex-1">
+      <span class="text-2xl block">${loc.icon}</span>
+      <span class="text-[9px] text-[var(--ink-300)] truncate block max-w-[70px]">${loc.name}</span>
+    </button>
+  `).join('');
+
+  main.innerHTML = `
+    <div class="panel rounded-2xl p-4 sm:p-6 mb-6 fade-in">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-[11px] uppercase tracking-widest text-[var(--ink-500)]">Vista aérea · Operación Distrival S.A.</p>
+        <span class="text-[10px] text-[var(--teal-400)] font-mono">${locations.length} zonas activas</span>
+      </div>
+      
+      <!-- Ubicaciones interactivas estilo botones -->
+      <div class="flex flex-wrap gap-1.5 sm:gap-2 mb-4">
+        ${locationButtons}
+      </div>
+      
+      <!-- Mapa SVG con marcadores -->
+      <div class="overflow-x-auto">
+        <svg viewBox="0 0 600 280" class="w-full max-w-3xl mx-auto" style="min-width:480px;">
+          <rect x="0" y="0" width="600" height="280" rx="16" fill="rgba(255,255,255,0.02)"/>
+          <line x1="0" y1="140" x2="600" y2="140" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 4"/>
+          <line x1="300" y1="0" x2="300" y2="280" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 4"/>
+          ${locations.map(loc => `
+            <g class="map-marker" onclick="showLocationInfo('${loc.id}')" transform="translate(${loc.x},${loc.y})">
+              <circle r="24" fill="rgba(46,196,182,0.08)" stroke="rgba(95,227,212,0.3)" stroke-width="1.5"/>
+              <circle r="18" fill="rgba(46,196,182,0.12)" stroke="rgba(95,227,212,0.2)" stroke-width="1"/>
+              <text x="0" y="7" text-anchor="middle" font-size="22">${loc.icon}</text>
+            </g>
+            <text x="${loc.x}" y="${loc.y+40}" text-anchor="middle" font-size="9" fill="var(--ink-300)" font-family="Inter" font-weight="500">${loc.name}</text>
+          `).join('')}
+        </svg>
+      </div>
+      
+      <!-- Info de ubicación seleccionada -->
+      <div id="selectedLocationInfo" class="mt-3 text-center text-xs text-[var(--ink-500)]">
+        Haz clic en cualquier ubicación o en el botón para explorar
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-display text-sm uppercase tracking-widest text-[var(--ink-500)]">Misiones</h2>
+      <p class="text-xs text-[var(--ink-500)] font-mono">${doneChallenges()}/${totalChallenges()} retos completados</p>
+    </div>
+    <div class="kpi-bar mb-5"><div class="kpi-fill" style="width:${Math.round(doneChallenges()/totalChallenges()*100)}%; background:var(--teal-400);"></div></div>
+
+    <div id="missionGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  `;
+
+  const grid = document.getElementById('missionGrid');
+  missions.forEach((wrap,idx)=>{
+    const m = wrap[0];
+    const total = m.challenges.length;
+    const done = m.challenges.filter(c=>c.done).length;
+    const unlocked = idx===0 || missions[idx-1][0].challenges.every(c=>c.done);
+    const isDone = done===total;
+    grid.innerHTML += `
+      <button onclick="${unlocked? `openMission(${idx})` : ''}" class="card-hover ${unlocked?'':'locked'} rounded-2xl p-5 text-left panel">
+        <div class="flex items-start justify-between mb-3">
+          <span class="text-3xl">${m.icon}</span>
+          ${isDone ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-[var(--green-400)]/15 text-[var(--green-400)] border border-[var(--green-400)]/30">Completa</span>'
+            : unlocked ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-[var(--ink-500)] border border-white/10">${done}/${total}</span>`
+            : '<span class="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-[var(--ink-500)] border border-white/10">🔒 Bloqueada</span>'}
+        </div>
+        <p class="text-[11px] uppercase tracking-widest text-[var(--ink-500)] mb-1">Misión ${idx+1}</p>
+        <p class="font-display font-semibold text-base mb-1.5">${m.name}</p>
+        <p class="text-[12px] text-[var(--ink-300)] leading-relaxed">${m.intro}</p>
+      </button>`;
+  });
+  updateHeaderCounters();
+}
+
+// Función para mostrar información de ubicación
+function showLocationInfo(id){
+  const loc = locations.find(l=>l.id===id);
+  if(!loc) return;
+  
+  const infoDiv = document.getElementById('selectedLocationInfo');
+  if(infoDiv){
+    infoDiv.innerHTML = `
+      <span class="text-[var(--teal-400)] font-medium">${loc.icon} ${loc.name}</span>
+      <span class="text-[var(--ink-300)]">— ${loc.desc || 'Zona operativa activa'}</span>
+    `;
+  }
+  
+  // Mostrar modal con información
+  document.getElementById('mapInfoIcon').textContent = loc.icon;
+  document.getElementById('mapInfoTitle').textContent = loc.name;
+  document.getElementById('mapInfoDesc').textContent = loc.desc || 'Selecciona una misión para operar en esta zona.';
+  document.getElementById('mapInfoModal').classList.remove('hidden');
+}
+
+/* ---------- ABRIR MISIÓN ---------- */
+function openMission(idx){
+  state.currentMissionIdx = idx;
+  const m = missions[idx][0];
+  const pending = m.challenges.findIndex(c=>!c.done);
+  state.currentChallengeIdx = pending===-1 ? 0 : pending;
+
+  document.getElementById('newsTicker').classList.toggle('hidden', !m.crisis);
+  if(m.crisis) startTicker(m);
+
+  if(pending===-1){ renderMissionComplete(m); return; }
+  renderChallenge();
+}
+
+function startTicker(m){
+  const headlines = m.challenges.map(c=>c.news).filter(Boolean).join("     •     ");
+  document.getElementById('tickerText').innerHTML = "⚠ ÚLTIMA HORA — " + headlines + "     •     " + headlines;
+}
+
+function renderChallenge(){
+  const m = missions[state.currentMissionIdx][0];
+  const c = m.challenges[state.currentChallengeIdx];
+  const loc = locations.find(l=>l.id===c.loc) || {icon:m.icon, name:m.name};
+
+  const main = document.getElementById('mainArea');
+  main.innerHTML = `
+    <button onclick="renderMissionHub()" class="text-xs text-[var(--ink-500)] hover:text-[var(--teal-300)] mb-4 inline-flex items-center gap-1">← Volver al mapa de misiones</button>
+    <div class="panel rounded-2xl p-5 sm:p-7 fade-in" id="scenarioPanel"></div>
+  `;
+  const panel = document.getElementById('scenarioPanel');
+
+  const newsBanner = c.news ? `
+    <div class="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-[var(--red-500)]/10 border border-[var(--red-500)]/30">
+      <span class="blink text-[var(--red-500)]">●</span>
+      <span class="text-[11px] font-mono text-[var(--red-500)]">${c.news}</span>
+    </div>` : "";
+
+  const visual = c.visual==="bullwhip" ? renderBullwhipSvg() : (c.visual==="alerta" ? renderAlertSvg() : "");
+
+  panel.innerHTML = `
+    ${newsBanner}
+    <div class="flex items-center gap-3 mb-4">
+      <span class="text-3xl">${loc.icon||m.icon}</span>
+      <div>
+        <p class="text-[11px] uppercase tracking-widest text-[var(--ink-500)]">${m.name} &middot; ${loc.name||""} &middot; Reto ${state.currentChallengeIdx+1}/${m.challenges.length}</p>
+        <h3 class="font-display text-lg sm:text-xl font-semibold">${c.title}</h3>
+      </div>
+    </div>
+    <p class="text-sm text-[var(--ink-300)] leading-relaxed mb-5 border-l-2 border-[var(--teal-400)]/40 pl-4">${c.context}</p>
+    ${visual}
+    <p class="text-[11px] uppercase tracking-widest text-[var(--ink-500)] mb-2">¿Qué decides?</p>
+    <div class="flex flex-col gap-2.5" id="optionsZone">
+      ${c.options.map((opt,i)=>`
+        <button onclick="chooseOption(${i})" class="option-btn rounded-xl px-4 py-3 text-sm text-left flex items-start gap-3">
+          <span class="font-mono text-xs text-[var(--teal-400)] mt-0.5">0${i+1}</span>
+          <span>${opt.label}</span>
+        </button>`).join('')}
+    </div>
+  `;
+}
+
+function renderBullwhipSvg(){
+  return `<div class="mb-5 panel rounded-xl p-4">
+    <p class="text-[11px] uppercase tracking-widest text-[var(--ink-500)] mb-2">Amplificación de la variabilidad en la cadena</p>
+    <svg viewBox="0 0 400 90" class="w-full max-w-md">
+      <text x="10" y="80" font-size="9" fill="var(--ink-500)">Cliente</text>
+      <rect x="10" y="60" width="20" height="15" fill="var(--blue-400)"/>
+      <text x="110" y="80" font-size="9" fill="var(--ink-500)">Distribuidor</text>
+      <rect x="110" y="45" width="20" height="30" fill="var(--purple-400)"/>
+      <text x="210" y="80" font-size="9" fill="var(--ink-500)">Fábrica</text>
+      <rect x="210" y="25" width="20" height="50" fill="var(--amber-400)"/>
+      <text x="310" y="80" font-size="9" fill="var(--ink-500)">Proveedor</text>
+      <rect x="310" y="5" width="20" height="70" fill="var(--red-500)"/>
+    </svg>
+  </div>`;
+}
+function renderAlertSvg(){
+  return `<div class="mb-5 flex items-center gap-3 panel rounded-xl p-4 border border-[var(--red-500)]/30">
+    <span class="text-2xl">🌡️</span>
+    <p class="text-xs text-[var(--ink-300)]">Sensor de temperatura: zona de almacenamiento ambiente · producto requiere <span class="text-[var(--red-500)] font-medium">25°C controlados</span></p>
+  </div>`;
+}
+
+function chooseOption(i){
+  const m = missions[state.currentMissionIdx][0];
+  const c = m.challenges[state.currentChallengeIdx];
+  const opt = c.options[i];
+  applyEffects(opt.effects);
+  c.done = true;
+  state.decisionsMade++;
+  state.log.push({mission:m.name, challenge:c.title, choice:opt.label});
+
+  const panel = document.getElementById('scenarioPanel');
+  panel.innerHTML += `
+    <div class="mt-5 pt-5 border-t border-white/10 fade-in">
+      <p class="text-[11px] uppercase tracking-widest text-[var(--teal-400)] mb-2">Resultado de tu decisión</p>
+      <p class="text-sm text-[var(--ink-100)] mb-4">${opt.feedback||''}</p>
+      <div class="flex flex-wrap gap-2 mb-5">
+        ${Object.entries(opt.effects).filter(([k,v])=>state.kpis[k] && v!==0).map(([k,v])=>{
+          const kpi = state.kpis[k];
+          const good = kpi.polarity==="low" ? v<0 : v>0;
+          return `<span class="text-[11px] font-mono px-2.5 py-1 rounded-full border ${good? 'border-[var(--green-400)]/40 text-[var(--green-400)] bg-[var(--green-400)]/10':'border-[var(--red-500)]/40 text-[var(--red-500)] bg-[var(--red-500)]/10'}">${kpi.icon} ${kpi.label} ${v>0?'+':''}${v}</span>`;
+        }).join('')}
+      </div>
+      <button onclick="advanceChallenge()" class="text-xs font-medium px-4 py-2 rounded-lg bg-[var(--teal-400)] text-navy-950 hover:bg-[var(--teal-300)] transition">Continuar →</button>
+    </div>`;
+
+  renderKpis();
+  updateHeaderCounters();
+  maybeTriggerRandomEvent(m);
+}
+
+function advanceChallenge(){
+  state.day += 1;
+  document.getElementById('dayCounter').textContent = String(state.day).padStart(2,'0');
+  const m = missions[state.currentMissionIdx][0];
+  const nextIdx = m.challenges.findIndex(c=>!c.done);
+  if(nextIdx===-1){ renderMissionComplete(m); return; }
+  state.currentChallengeIdx = nextIdx;
+  renderChallenge();
+}
+
+function renderMissionComplete(m){
+  const allDone = missions.every(w=>w[0].challenges.every(c=>c.done));
+  const main = document.getElementById('mainArea');
+  main.innerHTML = `
+    <div class="panel rounded-2xl p-7 text-center fade-in max-w-xl mx-auto">
+      <p class="text-[11px] uppercase tracking-widest text-[var(--teal-400)] mb-2">Misión completada</p>
+      <p class="text-3xl mb-2">${m.icon}</p>
+      <h3 class="font-display text-xl font-semibold mb-3">${m.name}</h3>
+      <p class="text-sm text-[var(--ink-300)] mb-6">Has resuelto los ${m.challenges.length} retos de esta misión. Tus indicadores reflejan el resultado acumulado de tu gestión.</p>
+      <button onclick="${allDone? 'showCertificate()' : 'renderMissionHub()'}" class="text-sm font-medium px-5 py-2.5 rounded-lg bg-[var(--teal-400)] text-navy-950 hover:bg-[var(--teal-300)] transition">
+        ${allDone? 'Generar certificado final →' : 'Volver al mapa de misiones →'}
+      </button>
+    </div>`;
+  updateHeaderCounters();
+}
+
+/* ====================================================================
+   EVENTOS ALEATORIOS DE FONDO
+==================================================================== */
+function maybeTriggerRandomEvent(currentMission){
+  if(currentMission.crisis) return; // la misión 4 ya es 100% eventos
+  if(Math.random() < 0.22 && state.decisionsMade>1){
+    const available = randomEvents.filter(e=>!state.eventsTriggered.has(e.id));
+    if(available.length===0) return;
+    const ev = available[Math.floor(Math.random()*available.length)];
+    state.eventsTriggered.add(ev.id);
+    setTimeout(()=>showEventModal(ev), 650);
+  }
+}
+function showEventModal(ev){
+  const modal = document.getElementById('eventModal');
+  const body = document.getElementById('eventModalBody');
+  modal.classList.remove('hidden');
+  body.innerHTML = `
+    <div class="flex items-center gap-2 mb-3">
+      <span class="blink text-[var(--red-500)] text-lg">●</span>
+      <p class="text-[11px] uppercase tracking-widest text-[var(--red-500)] font-semibold">Evento inesperado</p>
+    </div>
+    <h3 class="font-display text-lg font-semibold mb-2">${ev.title}</h3>
+    <p class="text-sm text-[var(--ink-300)] leading-relaxed mb-5">${ev.desc}</p>
+    <div class="flex flex-col gap-2.5">
+      ${ev.options.map((opt,i)=>`
+        <button onclick="resolveEvent(${i})" class="option-btn rounded-xl px-4 py-3 text-sm text-left flex items-start gap-3">
+          <span class="font-mono text-xs text-[var(--red-500)] mt-0.5">0${i+1}</span><span>${opt.label}</span>
+        </button>`).join('')}
+    </div>`;
+  window.currentEventRef = ev;
+}
+function resolveEvent(i){
+  const ev = window.currentEventRef;
+  applyEffects(ev.options[i].effects);
+  renderKpis();
+  document.getElementById('eventModal').classList.add('hidden');
+  flashToast(`<span class="font-medium">${ev.title}:</span> decisión aplicada a tus indicadores.`, "warn");
+}
+
+/* ====================================================================
+   TOASTS
+==================================================================== */
+function flashToast(msg, type="info"){
+  const zone = document.getElementById('toastZone');
+  const colors = {info:"var(--teal-400)", warn:"var(--amber-400)", bad:"var(--red-500)"};
+  const el = document.createElement('div');
+  el.className = "toast-in panel rounded-xl p-3 text-sm border-l-4";
+  el.style.borderLeftColor = colors[type]||colors.info;
+  el.innerHTML = msg;
+  zone.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .4s'; setTimeout(()=>el.remove(),400); }, 4200);
+}
+
+/* ====================================================================
+   CERTIFICADO FINAL
+==================================================================== */
+function showCertificate(){
+  document.getElementById('newsTicker').classList.add('hidden');
+  const avg = Object.values(state.kpis).reduce((a,k)=>{
+    const score = k.polarity==="low" ? (100-k.value) : k.value;
+    return a+score;
+  },0)/Object.values(state.kpis).length;
+
+  let level, levelColor, msg;
+  if(avg>=85){ level="Supply Chain Director"; levelColor="var(--green-400)"; msg="Gestión sobresaliente: anticipas riesgos, balanceas indicadores y conviertes la crisis en oportunidad."; }
+  else if(avg>=70){ level="Senior SCM Manager"; levelColor="var(--teal-300)"; msg="Gestión sólida con visión estratégica. Aún hay margen para perfeccionar el balance entre costo y servicio."; }
+  else if(avg>=55){ level="SCM Manager"; levelColor="var(--amber-400)"; msg="Gestión funcional. Algunas decisiones bajo presión generaron riesgos que conviene revisar."; }
+  else { level="SCM Trainee"; levelColor="var(--red-500)"; msg="La operación enfrentó riesgos críticos. Es momento de reforzar fundamentos antes de asumir un mandato global."; }
+
+  const weakest = Object.values(state.kpis).sort((a,b)=>{
+    const sa = a.polarity==="low" ? (100-a.value):a.value;
+    const sb = b.polarity==="low" ? (100-b.value):b.value;
+    return sa-sb;
+  }).slice(0,2);
+  const recommendations = {
+    rentabilidad:"Refuerza el análisis costo-beneficio antes de decisiones de transporte expreso o sobrecostos de emergencia.",
+    servicio:"Invierte en visibilidad de inventario y planes de contingencia para sostener el OTIF en momentos de crisis.",
+    inventario:"Adopta políticas de revisión cíclica y modelos de forecast más robustos para reducir errores de inventario.",
+    tiempo:"Evalúa automatización y rediseño de procesos para reducir tiempos de respuesta operativa.",
+    riesgo:"Diversifica proveedores críticos y documenta protocolos de contingencia ante eventos disruptivos.",
+    satisfaccion:"Prioriza la comunicación proactiva con clientes clave durante incidentes de servicio.",
+    huella:"Evalúa consolidación de cargas y proveedores locales para reducir el impacto ambiental de la red.",
+  };
+
+  document.getElementById('mainArea').innerHTML = `
+    <div class="panel rounded-2xl p-6 sm:p-10 fade-in max-w-2xl mx-auto" id="certCard">
+      <div class="text-center mb-6">
+        <p class="text-[11px] uppercase tracking-widest text-[var(--ink-500)] mb-2">NEXUS Supply Chain &middot; Certificado de gestión</p>
+        <h2 class="font-display text-2xl font-semibold mb-1">Certificado de Finalización</h2>
+        <p class="text-sm text-[var(--ink-300)]">Se otorga a</p>
+        <input id="certName" type="text" placeholder="Escribe tu nombre completo" value="${state.playerName}"
+          class="font-display text-xl font-semibold text-center bg-transparent border-b-2 border-[var(--teal-400)]/40 focus:border-[var(--teal-400)] outline-none mt-1 mb-1 w-full max-w-sm mx-auto py-1" />
+        <p class="text-xs text-[var(--ink-500)]">por completar las 5 misiones del simulador NEXUS SCM</p>
+      </div>
+
+      <div class="flex flex-col items-center mb-7">
+        <div class="w-28 h-28 rounded-full flex items-center justify-center border-4" style="border-color:${levelColor};">
+          <span class="font-mono text-3xl font-bold" style="color:${levelColor}">${Math.round(avg)}</span>
+        </div>
+        <p class="font-display font-semibold mt-3" style="color:${levelColor}">${level}</p>
+        <p class="text-xs text-[var(--ink-500)] font-mono">Puntuación general: ${Math.round(avg)}/100</p>
+      </div>
+
+      <p class="text-sm text-[var(--ink-300)] text-center mb-7 max-w-lg mx-auto">${msg}</p>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-7">
+        ${Object.values(state.kpis).map(k=>`
+          <div class="rounded-xl p-2.5 bg-white/[0.03] border border-white/10 text-center">
+            <p class="text-[10px] text-[var(--ink-300)] mb-1">${k.icon} ${k.label}</p>
+            <p class="font-mono font-bold" style="color:${kpiColor(k)}">${Math.round(k.value)}</p>
+          </div>`).join('')}
+      </div>
+
+      <div class="mb-7">
+        <p class="text-[11px] uppercase tracking-widest text-[var(--ink-500)] mb-2">Recomendaciones personalizadas</p>
+        <ul class="text-sm text-[var(--ink-300)] space-y-1.5 list-disc list-inside">
+          ${weakest.map(k=>`<li>${recommendations[Object.keys(state.kpis).find(key=>state.kpis[key]===k)]}</li>`).join('')}
+        </ul>
+      </div>
+
+      <div class="flex flex-wrap justify-center gap-3 print:hidden">
+        <button onclick="window.print()" class="text-xs font-medium px-4 py-2 rounded-lg bg-[var(--teal-400)] text-navy-950 hover:bg-[var(--teal-300)] transition">Imprimir / guardar como PDF</button>
+        <button onclick="location.reload()" class="text-xs font-medium px-4 py-2 rounded-lg bg-white/5 border border-white/15 hover:bg-white/10 transition">Reiniciar simulación</button>
+      </div>
+    </div>`;
+}
+
+/* ====================================================================
+   INIT
+==================================================================== */
+renderKpis();
+renderCinematicIntro();
+</script>
+</body>
+</html>
